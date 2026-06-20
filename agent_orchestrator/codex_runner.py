@@ -4,6 +4,8 @@ import json
 import time
 from pathlib import Path
 from string import Template
+from typing import Any
+
 from .run_log import estimate_tokens, utc_now
 from .shell import CommandResult, run_command
 
@@ -29,6 +31,62 @@ def _metrics_path(output_path: Path | None) -> Path | None:
     return output_path.with_suffix(output_path.suffix + ".metrics.json")
 
 
+def _events_path(output_path: Path | None) -> Path | None:
+    if output_path is None:
+        return None
+    return output_path.with_suffix(output_path.suffix + ".events.jsonl")
+
+
+def _stderr_path(output_path: Path | None) -> Path | None:
+    if output_path is None:
+        return None
+    return output_path.with_suffix(output_path.suffix + ".stderr.txt")
+
+
+def _extract_usage_from_events(events_jsonl: str) -> dict[str, int] | None:
+    usage: dict[str, int] | None = None
+    for line in events_jsonl.splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") != "turn.completed":
+            continue
+        raw_usage = event.get("usage")
+        if not isinstance(raw_usage, dict):
+            continue
+        usage = {
+            "input_tokens": int(raw_usage.get("input_tokens") or 0),
+            "cached_input_tokens": int(raw_usage.get("cached_input_tokens") or 0),
+            "output_tokens": int(raw_usage.get("output_tokens") or 0),
+            "reasoning_output_tokens": int(raw_usage.get("reasoning_output_tokens") or 0),
+        }
+        usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
+    return usage
+
+
+def _write_role_artifacts(
+    *,
+    output_path: Path | None,
+    result: CommandResult,
+) -> dict[str, Any]:
+    events_path = _events_path(output_path)
+    stderr_path = _stderr_path(output_path)
+    if events_path is not None:
+        events_path.write_text(result.stdout, encoding="utf-8")
+    if stderr_path is not None:
+        stderr_path.write_text(result.stderr, encoding="utf-8")
+    usage = _extract_usage_from_events(result.stdout)
+    return {
+        "events_path": str(events_path) if events_path else None,
+        "stderr_path": str(stderr_path) if stderr_path else None,
+        "codex_usage": usage,
+        "usage_source": "codex-jsonl-turn.completed" if usage else None,
+    }
+
+
 def _write_role_metrics(
     *,
     output_path: Path | None,
@@ -41,10 +99,12 @@ def _write_role_metrics(
     prompt: str,
     result: CommandResult,
     output_text: str,
+    artifacts: dict[str, Any] | None = None,
 ) -> None:
     path = _metrics_path(output_path)
     if path is None:
         return
+    artifacts = artifacts or {}
     payload = {
         "role": role,
         "model": model,
@@ -55,12 +115,16 @@ def _write_role_metrics(
         "returncode": result.returncode,
         "ok": result.ok,
         "output_path": str(output_path),
+        "events_path": artifacts.get("events_path"),
+        "stderr_path": artifacts.get("stderr_path"),
         "prompt_chars": len(prompt),
         "prompt_tokens_estimate": estimate_tokens(prompt),
         "output_chars": len(output_text),
         "output_tokens_estimate": estimate_tokens(output_text),
         "stdout_chars": len(result.stdout),
         "stderr_chars": len(result.stderr),
+        "codex_usage": artifacts.get("codex_usage"),
+        "usage_source": artifacts.get("usage_source"),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -104,6 +168,7 @@ def run_codex_role(
     args = [
         "codex",
         "exec",
+        "--json",
         "--cd",
         str(Path(cwd).resolve()),
         "--model",
@@ -119,6 +184,7 @@ def run_codex_role(
         args.extend(extra_args)
     args.append("-")
     result = run_command(args, cwd=cwd, input_text=prompt, check=False)
+    artifacts = _write_role_artifacts(output_path=output_path, result=result)
     output_text = output_path.read_text(encoding="utf-8") if output_path and output_path.exists() else result.stdout
     _write_role_metrics(
         output_path=output_path,
@@ -131,5 +197,6 @@ def run_codex_role(
         prompt=prompt,
         result=result,
         output_text=output_text,
+        artifacts=artifacts,
     )
     return result
