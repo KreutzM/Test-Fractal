@@ -112,6 +112,17 @@ class RunState:
             "reviewer": _metrics_sidecar(self.reviewer_output),
         }
 
+    def _existing_artifact(self, name: str) -> str | None:
+        path = self.run_dir / name
+        return str(path) if path.exists() else None
+
+    def _codex_status_paths(self) -> dict[str, str | None]:
+        return {
+            "before": self._existing_artifact("codex-status-before.json"),
+            "after": self._existing_artifact("codex-status-after.json"),
+            "delta": self._existing_artifact("codex-status-delta.json"),
+        }
+
     def _append_event(self, data: dict[str, Any]) -> None:
         event = {
             "ts": self.updated_at,
@@ -141,6 +152,7 @@ class RunState:
                 "reviewer": self.reviewer_output,
                 "tests": self.test_output,
                 "role_metrics": self._role_metric_paths(),
+                "codex_status": self._codex_status_paths(),
             },
         }
         self.run_json_path.write_text(
@@ -150,6 +162,7 @@ class RunState:
 
     def _write_summary(self) -> None:
         metrics = self._role_metric_paths()
+        codex_status = self._codex_status_paths()
         lines = [
             "# Agent Run Summary",
             "",
@@ -180,6 +193,12 @@ class RunState:
             f"- Planner: `{metrics['planner'] or 'n/a'}`",
             f"- Builder: `{metrics['builder'] or 'n/a'}`",
             f"- Reviewer: `{metrics['reviewer'] or 'n/a'}`",
+            "",
+            "## Codex status snapshots",
+            "",
+            f"- Before: `{codex_status['before'] or 'n/a'}`",
+            f"- After: `{codex_status['after'] or 'n/a'}`",
+            f"- Delta: `{codex_status['delta'] or 'n/a'}`",
         ]
         if self.last_error:
             lines.extend(["", "## Last error", "", self.last_error])
