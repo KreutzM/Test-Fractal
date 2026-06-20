@@ -75,6 +75,7 @@ def run_command(
             cwd=str(cwd) if cwd else None,
             input=input_text,
             text=True,
+            encoding="utf-8",
             capture_output=True,
             env=dict(env) if env else None,
         )
