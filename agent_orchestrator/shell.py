@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 import subprocess
 from pathlib import Path
+from shutil import which
 from typing import Mapping, Sequence
 
 
@@ -28,6 +30,36 @@ class CommandError(RuntimeError):
         super().__init__(f"Command failed with exit {result.returncode}: {joined}\n{result.stderr}")
 
 
+def resolve_executable(args: Sequence[str]) -> list[str]:
+    """Resolve command shims before subprocess execution.
+
+    On Windows, npm-installed CLIs often appear as PowerShell scripts when queried
+    from PowerShell, while subprocess without shell=True needs an executable file.
+    Prefer .cmd and .exe shims so tools like codex can be launched reliably.
+    """
+    resolved = list(args)
+    if not resolved:
+        return resolved
+
+    command = resolved[0]
+
+    if os.path.dirname(command) or os.path.splitext(command)[1]:
+        return resolved
+
+    if os.name == "nt":
+        for suffix in (".cmd", ".exe"):
+            candidate = which(command + suffix)
+            if candidate:
+                resolved[0] = candidate
+                return resolved
+
+    found = which(command)
+    if found:
+        resolved[0] = found
+
+    return resolved
+
+
 def run_command(
     args: Sequence[str],
     *,
@@ -36,16 +68,29 @@ def run_command(
     env: Mapping[str, str] | None = None,
     check: bool = False,
 ) -> CommandResult:
-    completed = subprocess.run(
-        list(args),
-        cwd=str(cwd) if cwd else None,
-        input=input_text,
-        text=True,
-        capture_output=True,
-        env=dict(env) if env else None,
-    )
+    resolved_args = resolve_executable(args)
+    try:
+        completed = subprocess.run(
+            resolved_args,
+            cwd=str(cwd) if cwd else None,
+            input=input_text,
+            text=True,
+            capture_output=True,
+            env=dict(env) if env else None,
+        )
+    except FileNotFoundError as exc:
+        result = CommandResult(
+            args=list(resolved_args),
+            returncode=127,
+            stdout="",
+            stderr=f"Executable not found: {resolved_args[0]}\n{exc}",
+        )
+        if check:
+            raise CommandError(result) from exc
+        return result
+
     result = CommandResult(
-        args=list(args),
+        args=list(resolved_args),
         returncode=completed.returncode,
         stdout=completed.stdout or "",
         stderr=completed.stderr or "",
