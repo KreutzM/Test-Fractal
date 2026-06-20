@@ -122,6 +122,8 @@ Die Codex-Projektkonfiguration liegt in:
 
 `.codex/config.toml`
 
+Für Connector-basierte Evaluation und Review sind die Leitfäden in `docs/GITHUB_CONNECTOR_WORKFLOW.md`, `docs/REPO_MAP.md`, `docs/LABELS.md` und `docs/REVIEW_PROTOCOL.md` relevant.
+
 ## Typische Kommandos
 
 Umgebung prüfen:
