@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import shlex
 from .codex_runner import run_codex_role
+from .codex_status import capture_status_snapshot, write_status_delta
 from .config import load_config
 from .git_ops import (
     branch_diff_stat,
@@ -64,6 +65,22 @@ def _test_report(config: dict, cwd: Path | str = ".") -> tuple[bool, str]:
     return all_ok, "\n\n".join(blocks)
 
 
+def _capture_codex_status(state: RunState, config: dict, label: str) -> None:
+    capture_status_snapshot(
+        output_path=state.run_dir / f"codex-status-{label}.json",
+        label=label,
+        config=config,
+    )
+
+
+def _write_codex_status_delta(state: RunState) -> None:
+    write_status_delta(
+        before_path=state.run_dir / "codex-status-before.json",
+        after_path=state.run_dir / "codex-status-after.json",
+        output_path=state.run_dir / "codex-status-delta.json",
+    )
+
+
 def _review_decision(text: str) -> str:
     lowered = text.lower()
     for decision in ["approve", "request_changes", "block"]:
@@ -122,6 +139,8 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
     issue = issue_view(issue_number)
     branch = f"{config['work_branch_prefix']}{issue_number}"
     state = RunState(issue=issue_number, branch=branch)
+    state.save()
+    _capture_codex_status(state, config, "before")
     state.save()
 
     labels = config["labels"]
@@ -199,7 +218,10 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
             state.status = "testing"
             state.save()
             tests_ok, test_text = _test_report(config)
-            (state.run_dir / f"tests-cycle-{cycle}.txt").write_text(test_text + "\n", encoding="utf-8")
+            test_path = state.run_dir / f"tests-cycle-{cycle}.txt"
+            test_path.write_text(test_text + "\n", encoding="utf-8")
+            state.test_output = str(test_path)
+            state.save()
             if not tests_ok:
                 review_feedback = "Tests failed. Fix the failing tests or implementation.\n\n" + test_text
                 if cycle < config["max_cycles"]:
@@ -239,6 +261,8 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
                 raise RuntimeError(f"Reviewer failed: {reviewer_result.stderr}")
 
             decision = _review_decision(reviewer_text)
+            state.final_decision = decision
+            state.save()
             if decision == "approve":
                 break
             if decision == "block":
@@ -268,6 +292,8 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
                 draft=bool(config["pr"].get("draft", True)),
             )
 
+        _capture_codex_status(state, config, "after")
+        _write_codex_status_delta(state)
         state.pr_url = pr_url
         state.status = "ready_for_human"
         state.save()
@@ -282,6 +308,11 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
         print(f"Agent run finished. PR: {pr_url}")
         return 0
     except Exception as exc:
+        try:
+            _capture_codex_status(state, config, "after")
+            _write_codex_status_delta(state)
+        except Exception:
+            pass
         state.status = "blocked"
         state.last_error = str(exc)
         state.save()
