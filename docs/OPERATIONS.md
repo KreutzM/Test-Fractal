@@ -26,9 +26,9 @@
 
 Der Dry Run rendert Prompts und legt lokalen State an, ruft aber Codex nicht produktiv auf.
 
-## Arbeit Ã¼ber den GitHub-Connector
+## Arbeit über den GitHub-Connector
 
-FÃ¼r Evaluation oder Review Ã¼ber den GitHub-Connector zuerst diese Dokumente lesen:
+Für Evaluation oder Review über den GitHub-Connector zuerst diese Dokumente lesen:
 
 - `docs/GITHUB_CONNECTOR_WORKFLOW.md`
 - `docs/REPO_MAP.md`
