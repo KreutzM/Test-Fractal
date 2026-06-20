@@ -27,6 +27,10 @@ class MandelbrotTests(unittest.TestCase):
             RenderParams(width=32, height=24, max_iterations=0, x_min=-2.0, x_max=1.0, y_min=-1.0, y_max=1.0),
             RenderParams(width=32, height=24, max_iterations=20, x_min=1.0, x_max=1.0, y_min=-1.0, y_max=1.0),
             RenderParams(width=32, height=24, max_iterations=20, x_min=-2.0, x_max=1.0, y_min=1.0, y_max=1.0),
+            RenderParams(width=32, height=24, max_iterations=20, x_min=float("nan"), x_max=1.0, y_min=-1.0, y_max=1.0),
+            RenderParams(width=32, height=24, max_iterations=20, x_min=-2.0, x_max=float("inf"), y_min=-1.0, y_max=1.0),
+            RenderParams(width=32, height=24, max_iterations=20, x_min=-2.0, x_max=1.0, y_min=float("-inf"), y_max=1.0),
+            RenderParams(width=32, height=24, max_iterations=20, x_min=-2.0, x_max=1.0, y_min=-1.0, y_max=float("nan")),
             RenderParams(
                 width=32,
                 height=24,
@@ -43,6 +47,12 @@ class MandelbrotTests(unittest.TestCase):
             with self.subTest(params=params):
                 with self.assertRaises(ValueError):
                     validate_params(params)
+
+    def test_colorize_iterations_rejects_non_positive_max_iterations(self):
+        iterations = np.zeros((2, 2), dtype=np.int32)
+
+        with self.assertRaises(ValueError):
+            colorize_iterations(iterations, 0, "classic")
 
     def test_validate_params_rejects_non_integer_dimensions_and_iterations(self):
         invalid_cases = [

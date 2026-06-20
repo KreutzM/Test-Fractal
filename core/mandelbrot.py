@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 from numbers import Integral
+from numbers import Real
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -62,6 +64,10 @@ def _is_int_like(value: object) -> bool:
     return isinstance(value, Integral) and not isinstance(value, bool)
 
 
+def _is_finite_real(value: object) -> bool:
+    return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(float(value))
+
+
 def validate_params(params: RenderParams) -> RenderParams:
     if not _is_int_like(params.width):
         raise ValueError("width must be an integer")
@@ -75,6 +81,14 @@ def validate_params(params: RenderParams) -> RenderParams:
         raise ValueError("height must be positive")
     if params.max_iterations <= 0:
         raise ValueError("max_iterations must be positive")
+    if not _is_finite_real(params.x_min):
+        raise ValueError("x_min must be a finite number")
+    if not _is_finite_real(params.x_max):
+        raise ValueError("x_max must be a finite number")
+    if not _is_finite_real(params.y_min):
+        raise ValueError("y_min must be a finite number")
+    if not _is_finite_real(params.y_max):
+        raise ValueError("y_max must be a finite number")
     if params.x_min >= params.x_max:
         raise ValueError("x_min must be smaller than x_max")
     if params.y_min >= params.y_max:
@@ -129,6 +143,8 @@ def _sample_gradient(stops: np.ndarray, values: np.ndarray) -> np.ndarray:
 
 
 def colorize_iterations(iterations: np.ndarray, max_iterations: int, palette: str) -> np.ndarray:
+    if not _is_int_like(max_iterations) or max_iterations <= 0:
+        raise ValueError("max_iterations must be positive")
     palette_key = palette.lower()
     if palette_key not in _PALETTE_STOPS:
         raise ValueError(f"unknown palette: {palette}")
