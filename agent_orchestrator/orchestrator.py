@@ -111,8 +111,9 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
     state.save()
 
     labels = config["labels"]
-    add_label_to_issue(issue_number, labels["running"])
-    remove_label_from_issue(issue_number, labels["queue"])
+    if not dry_run:
+        add_label_to_issue(issue_number, labels["running"])
+        remove_label_from_issue(issue_number, labels["queue"])
 
     try:
         if not dry_run:
@@ -241,24 +242,26 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
         state.status = "ready_for_human"
         state.save()
 
-        add_label_to_issue(issue_number, labels["ready"])
-        remove_label_from_issue(issue_number, labels["running"])
-        comment_issue(
-            issue_number,
-            f"Agent run finished. Status: ready_for_human. Branch: `{branch}`. PR: {pr_url}",
-        )
+        if not dry_run:
+            add_label_to_issue(issue_number, labels["ready"])
+            remove_label_from_issue(issue_number, labels["running"])
+            comment_issue(
+                issue_number,
+                f"Agent run finished. Status: ready_for_human. Branch: `{branch}`. PR: {pr_url}",
+            )
         print(f"Agent run finished. PR: {pr_url}")
         return 0
     except Exception as exc:
         state.status = "blocked"
         state.last_error = str(exc)
         state.save()
-        add_label_to_issue(issue_number, labels["blocked"])
-        remove_label_from_issue(issue_number, labels["running"])
-        try:
-            comment_issue(issue_number, f"Agent run blocked. Reason: {exc}")
-        except Exception:
-            pass
+        if not dry_run:
+            add_label_to_issue(issue_number, labels["blocked"])
+            remove_label_from_issue(issue_number, labels["running"])
+            try:
+                comment_issue(issue_number, f"Agent run blocked. Reason: {exc}")
+            except Exception:
+                pass
         print(f"Agent run blocked: {exc}")
         return 1
 

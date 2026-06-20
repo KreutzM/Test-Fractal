@@ -26,6 +26,15 @@
 
 Der Dry Run rendert Prompts und legt lokalen State an, ruft aber Codex nicht produktiv auf.
 
+## Arbeit Ã¼ber den GitHub-Connector
+
+FÃ¼r Evaluation oder Review Ã¼ber den GitHub-Connector zuerst diese Dokumente lesen:
+
+- `docs/GITHUB_CONNECTOR_WORKFLOW.md`
+- `docs/REPO_MAP.md`
+- `docs/LABELS.md`
+- `docs/REVIEW_PROTOCOL.md`
+
 ## Logs
 
 Lokale Logs liegen unter `.agent/runs/issue-<nummer>/`.
