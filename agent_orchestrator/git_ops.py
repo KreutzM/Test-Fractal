@@ -13,6 +13,13 @@ def current_branch(cwd: Path | str = ".") -> str:
     return git(["branch", "--show-current"], cwd=cwd).stdout.strip()
 
 
+def revision(ref: str = "HEAD", cwd: Path | str = ".") -> str | None:
+    result = git(["rev-parse", "--verify", ref], cwd=cwd, check=False)
+    if result.ok and result.stdout.strip():
+        return result.stdout.strip()
+    return None
+
+
 def ensure_git_repo(cwd: Path | str = ".") -> bool:
     result = git(["rev-parse", "--is-inside-work-tree"], cwd=cwd, check=False)
     return result.ok and result.stdout.strip() == "true"
