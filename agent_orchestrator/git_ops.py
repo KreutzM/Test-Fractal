@@ -52,6 +52,19 @@ def changed_files(cwd: Path | str = ".") -> list[str]:
     return files
 
 
+def _diff_base(base_branch: str, cwd: Path | str = ".") -> str:
+    origin_ref = f"origin/{base_branch}"
+    result = git(["rev-parse", "--verify", origin_ref], cwd=cwd, check=False)
+    if result.ok:
+        return origin_ref
+    return base_branch
+
+
+def stage_intent_to_add(cwd: Path | str = ".") -> None:
+    # Make new files visible to git diff before the final commit without staging contents yet.
+    git(["add", "--intent-to-add", "--all"], cwd=cwd, check=False)
+
+
 def diff_stat(cwd: Path | str = ".") -> str:
     return git(["diff", "--stat"], cwd=cwd, check=False).stdout
 
@@ -65,6 +78,32 @@ def diff_text(cwd: Path | str = ".", *, max_chars: int = 100_000) -> str:
 
 def diff_line_count(cwd: Path | str = ".") -> int:
     text = git(["diff", "--numstat"], cwd=cwd, check=False).stdout
+    total = 0
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            for value in parts[:2]:
+                if value.isdigit():
+                    total += int(value)
+    return total
+
+
+def branch_diff_stat(base_branch: str, cwd: Path | str = ".") -> str:
+    base = _diff_base(base_branch, cwd)
+    return git(["diff", "--stat", f"{base}...HEAD"], cwd=cwd, check=False).stdout
+
+
+def branch_diff_text(base_branch: str, cwd: Path | str = ".", *, max_chars: int = 100_000) -> str:
+    base = _diff_base(base_branch, cwd)
+    text = git(["diff", f"{base}...HEAD", "--", "."], cwd=cwd, check=False).stdout
+    if len(text) > max_chars:
+        return text[:max_chars] + "\n\n[diff truncated by orchestrator]\n"
+    return text
+
+
+def branch_diff_line_count(base_branch: str, cwd: Path | str = ".") -> int:
+    base = _diff_base(base_branch, cwd)
+    text = git(["diff", "--numstat", f"{base}...HEAD"], cwd=cwd, check=False).stdout
     total = 0
     for line in text.splitlines():
         parts = line.split("\t")
@@ -93,11 +132,12 @@ def forbidden_changes(files: list[str], forbidden_paths: list[str]) -> list[str]
     return sorted(set(hits))
 
 
-def commit_all(message: str, cwd: Path | str = ".") -> None:
+def commit_all(message: str, cwd: Path | str = ".") -> bool:
     if not has_changes(cwd):
-        return
+        return False
     git(["add", "--all"], cwd=cwd)
     git(["commit", "-m", message], cwd=cwd)
+    return True
 
 
 def push_branch(branch: str, cwd: Path | str = ".") -> None:

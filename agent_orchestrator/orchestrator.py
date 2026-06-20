@@ -5,17 +5,18 @@ import shlex
 from .codex_runner import run_codex_role
 from .config import load_config
 from .git_ops import (
+    branch_diff_stat,
+    branch_diff_text,
     changed_files,
     commit_all,
     create_or_checkout_branch,
     current_branch,
     diff_line_count,
-    diff_stat,
-    diff_text,
     ensure_clean_worktree,
     forbidden_changes,
     has_changes,
     push_branch,
+    stage_intent_to_add,
 )
 from .github_ops import (
     add_label_to_issue,
@@ -87,7 +88,15 @@ def _issue_body(issue: dict) -> str:
     )
 
 
-def _common_variables(issue: dict, state: RunState, *, planner: str = "", builder: str = "", tests: str = "") -> dict[str, str]:
+def _common_variables(
+    issue: dict,
+    state: RunState,
+    *,
+    base_branch: str = "main",
+    planner: str = "",
+    builder: str = "",
+    tests: str = "",
+) -> dict[str, str]:
     return {
         "issue_number": str(issue["number"]),
         "issue_title": issue["title"],
@@ -97,10 +106,15 @@ def _common_variables(issue: dict, state: RunState, *, planner: str = "", builde
         "planner_output": planner,
         "builder_output": builder,
         "test_report": tests,
-        "diff_stat": diff_stat(),
-        "diff_text": diff_text(max_chars=100_000),
+        "diff_stat": branch_diff_stat(base_branch),
+        "diff_text": branch_diff_text(base_branch, max_chars=100_000),
         "current_branch": current_branch(),
     }
+
+
+def _builder_commit_message(config: dict, issue_number: int, issue_title: str, cycle: int) -> str:
+    base = config["commit_message_template"].format(issue=issue_number, title=issue_title)
+    return f"{base} (builder cycle {cycle})"
 
 
 def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json", dry_run: bool = False) -> int:
@@ -125,7 +139,7 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
         planner_path = state.run_dir / "planner.md"
         planner_result = run_codex_role(
             role="planner",
-            variables=_common_variables(issue, state),
+            variables=_common_variables(issue, state, base_branch=config["base_branch"]),
             model=config["model"],
             sandbox=config["codex"]["planner_sandbox"],
             approval=config["codex"]["approval"],
@@ -151,7 +165,10 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
             builder_path = state.run_dir / f"builder-cycle-{cycle}.md"
             builder_result = run_codex_role(
                 role="builder",
-                variables={**_common_variables(issue, state, planner=planner_text, tests=test_text), "review_feedback": review_feedback},
+                variables={
+                    **_common_variables(issue, state, base_branch=config["base_branch"], planner=planner_text, tests=test_text),
+                    "review_feedback": review_feedback,
+                },
                 model=config["model"],
                 sandbox=config["codex"]["builder_sandbox"],
                 approval=config["codex"]["approval"],
@@ -165,6 +182,8 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
             if not builder_result.ok:
                 raise RuntimeError(f"Builder failed: {builder_result.stderr}")
 
+            if not dry_run:
+                stage_intent_to_add()
             files = changed_files() if not dry_run else []
             forbidden = forbidden_changes(files, config.get("forbidden_paths", []))
             if forbidden:
@@ -187,12 +206,25 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
                     continue
                 raise RuntimeError("Tests failed after maximum cycles. See local .agent/runs logs.")
 
+            if not dry_run and has_changes():
+                message = _builder_commit_message(config, issue_number, issue["title"], cycle)
+                committed = commit_all(message)
+                if committed:
+                    push_branch(branch)
+
             state.status = "reviewing"
             state.save()
             reviewer_path = state.run_dir / f"reviewer-cycle-{cycle}.md"
             reviewer_result = run_codex_role(
                 role="reviewer",
-                variables=_common_variables(issue, state, planner=planner_text, builder=builder_text, tests=test_text),
+                variables=_common_variables(
+                    issue,
+                    state,
+                    base_branch=config["base_branch"],
+                    planner=planner_text,
+                    builder=builder_text,
+                    tests=test_text,
+                ),
                 model=config["model"],
                 sandbox=config["codex"]["reviewer_sandbox"],
                 approval=config["codex"]["approval"],
@@ -217,9 +249,7 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
 
         state.status = "publishing"
         state.save()
-        if not dry_run and has_changes():
-            message = config["commit_message_template"].format(issue=issue_number, title=issue["title"])
-            commit_all(message)
+        if not dry_run:
             push_branch(branch)
 
         pr = None if dry_run else pr_view_by_head(branch)
