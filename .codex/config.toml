@@ -1,0 +1,13 @@
+# Project-scoped Codex configuration.
+# Auth/provider settings stay user-local. This repo assumes Codex CLI is already
+# signed in with ChatGPT, so no API key is stored here.
+
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+model_reasoning_summary = "concise"
+model_verbosity = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = false

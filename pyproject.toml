@@ -1,0 +1,17 @@
+[project]
+name = "codex-local-agent-orchestrator"
+version = "0.1.0"
+description = "Local Git/GitHub orchestration layer for Codex CLI multi-agent workflows"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Micha k" }]
+
+[project.scripts]
+agent-orchestrator = "agent_orchestrator.cli:main"
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
