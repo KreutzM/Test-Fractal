@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from . import __version__
 from .doctor import check_environment
 from .labels import ensure_agent_labels
 from .orchestrator import run_issue
@@ -8,6 +9,11 @@ from .orchestrator import run_issue
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agent-orchestrator")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=__version__,
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("doctor", help="Check local prerequisites and authentication.")
