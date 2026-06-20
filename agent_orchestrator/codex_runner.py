@@ -50,8 +50,6 @@ def run_codex_role(
         model,
         "--sandbox",
         sandbox,
-        "--ask-for-approval",
-        approval,
         "--color",
         "never",
     ]
