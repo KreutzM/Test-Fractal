@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from agent_orchestrator.codex_runner import run_codex_role
+from agent_orchestrator.codex_runner import _extract_usage_from_events, run_codex_role
+from agent_orchestrator.shell import CommandResult
 
 
 class CodexRunnerMetricsTests(unittest.TestCase):
@@ -38,6 +39,84 @@ class CodexRunnerMetricsTests(unittest.TestCase):
             self.assertGreater(metrics["prompt_chars"], 0)
             self.assertGreater(metrics["output_chars"], 0)
             self.assertGreaterEqual(metrics["duration_ms"], 0)
+
+    def test_extract_usage_from_turn_completed_event(self):
+        events = "\n".join(
+            [
+                json.dumps({"type": "turn.started"}),
+                json.dumps(
+                    {
+                        "type": "turn.completed",
+                        "usage": {
+                            "input_tokens": 100,
+                            "cached_input_tokens": 40,
+                            "output_tokens": 20,
+                            "reasoning_output_tokens": 7,
+                        },
+                    }
+                ),
+            ]
+        )
+
+        usage = _extract_usage_from_events(events)
+
+        self.assertEqual(
+            usage,
+            {
+                "input_tokens": 100,
+                "cached_input_tokens": 40,
+                "output_tokens": 20,
+                "reasoning_output_tokens": 7,
+                "total_tokens": 120,
+            },
+        )
+
+    def test_json_mode_writes_events_stderr_and_actual_usage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prompt_dir = Path(tmp) / "prompts"
+            prompt_dir.mkdir()
+            (prompt_dir / "builder.md").write_text("Build $thing", encoding="utf-8")
+            output_path = Path(tmp) / "builder-cycle-1.md"
+            output_path.write_text("final answer", encoding="utf-8")
+            events = json.dumps(
+                {
+                    "type": "turn.completed",
+                    "usage": {
+                        "input_tokens": 10,
+                        "cached_input_tokens": 2,
+                        "output_tokens": 3,
+                        "reasoning_output_tokens": 1,
+                    },
+                }
+            )
+
+            def fake_run_command(args, *, cwd=None, input_text=None, check=True, env=None):
+                self.assertIn("--json", args)
+                return CommandResult(args, 0, events + "\n", "debug text")
+
+            with (
+                patch("agent_orchestrator.codex_runner.PROMPT_DIR", prompt_dir),
+                patch("agent_orchestrator.codex_runner.run_command", fake_run_command),
+            ):
+                result = run_codex_role(
+                    role="builder",
+                    variables={"thing": "feature"},
+                    model="test-model",
+                    sandbox="workspace-write",
+                    approval="never",
+                    output_path=output_path,
+                )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(output_path.with_suffix(output_path.suffix + ".events.jsonl").read_text(encoding="utf-8"), events + "\n")
+            self.assertEqual(output_path.with_suffix(output_path.suffix + ".stderr.txt").read_text(encoding="utf-8"), "debug text")
+            metrics = json.loads(output_path.with_suffix(output_path.suffix + ".metrics.json").read_text(encoding="utf-8"))
+            self.assertEqual(metrics["events_path"], str(output_path.with_suffix(output_path.suffix + ".events.jsonl")))
+            self.assertEqual(metrics["stderr_path"], str(output_path.with_suffix(output_path.suffix + ".stderr.txt")))
+            self.assertEqual(metrics["usage_source"], "codex-jsonl-turn.completed")
+            self.assertEqual(metrics["codex_usage"]["input_tokens"], 10)
+            self.assertEqual(metrics["codex_usage"]["output_tokens"], 3)
+            self.assertEqual(metrics["codex_usage"]["total_tokens"], 13)
 
 
 if __name__ == "__main__":
