@@ -34,6 +34,14 @@ def _format_duration(ms: int | None) -> str:
     return f"{int(hours)}h {int(minutes)}m"
 
 
+def _metrics_sidecar(path_text: str | None) -> str | None:
+    if not path_text:
+        return None
+    path = Path(path_text)
+    sidecar = path.with_suffix(path.suffix + ".metrics.json")
+    return str(sidecar) if sidecar.exists() else None
+
+
 @dataclass
 class RunState:
     issue: int
@@ -97,6 +105,13 @@ class RunState:
         self._write_summary()
         self._print_status_change()
 
+    def _role_metric_paths(self) -> dict[str, str | None]:
+        return {
+            "planner": _metrics_sidecar(self.planner_output),
+            "builder": _metrics_sidecar(self.builder_output),
+            "reviewer": _metrics_sidecar(self.reviewer_output),
+        }
+
     def _append_event(self, data: dict[str, Any]) -> None:
         event = {
             "ts": self.updated_at,
@@ -125,6 +140,7 @@ class RunState:
                 "builder": self.builder_output,
                 "reviewer": self.reviewer_output,
                 "tests": self.test_output,
+                "role_metrics": self._role_metric_paths(),
             },
         }
         self.run_json_path.write_text(
@@ -133,6 +149,7 @@ class RunState:
         )
 
     def _write_summary(self) -> None:
+        metrics = self._role_metric_paths()
         lines = [
             "# Agent Run Summary",
             "",
@@ -157,6 +174,12 @@ class RunState:
             f"- Builder: `{self.builder_output or 'n/a'}`",
             f"- Reviewer: `{self.reviewer_output or 'n/a'}`",
             f"- Tests: `{self.test_output or 'n/a'}`",
+            "",
+            "## Role metrics",
+            "",
+            f"- Planner: `{metrics['planner'] or 'n/a'}`",
+            f"- Builder: `{metrics['builder'] or 'n/a'}`",
+            f"- Reviewer: `{metrics['reviewer'] or 'n/a'}`",
         ]
         if self.last_error:
             lines.extend(["", "## Last error", "", self.last_error])
