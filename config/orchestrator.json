@@ -32,7 +32,8 @@
     "builder_sandbox": "workspace-write",
     "reviewer_sandbox": "read-only",
     "planner_sandbox": "read-only",
-    "extra_args": []
+    "extra_args": [],
+    "status_command": null
   },
   "pr": {
     "draft": true,
