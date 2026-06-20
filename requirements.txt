@@ -1,3 +1,5 @@
 # Runtime dependencies
 # This orchestrator intentionally uses only the Python 3.11 standard library.
 # External tools required on PATH: git, gh, codex.
+numpy
+Pillow
