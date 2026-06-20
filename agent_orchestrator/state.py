@@ -22,9 +22,19 @@ class RunState:
     cycle: int = 0
     started_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
+    finished_at: str | None = None
+    duration_ms: int | None = None
+    run_id: str | None = None
+    final_decision: str | None = None
+    base_sha: str | None = None
+    head_sha: str | None = None
     planner_output: str | None = None
     builder_output: str | None = None
     reviewer_output: str | None = None
+    test_output: str | None = None
+    run_log_output: str | None = None
+    events_output: str | None = None
+    summary_output: str | None = None
     last_error: str | None = None
     pr_url: str | None = None
 
