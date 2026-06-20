@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Sequence
 
-from .mandelbrot import DEFAULT_PARAMS, RenderParams, render_png, validate_params
+from .mandelbrot import DEFAULT_PARAMS, PALETTE_NAMES, RenderParams, render_png, validate_params
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--palette",
         default=DEFAULT_PARAMS.palette,
-        choices=("classic", "grayscale", "fire"),
+        choices=PALETTE_NAMES,
     )
     parser.add_argument("--metadata-output", help="Optional path for the metadata JSON file.")
     return parser

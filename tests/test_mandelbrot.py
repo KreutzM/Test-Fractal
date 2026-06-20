@@ -44,6 +44,18 @@ class MandelbrotTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_params(params)
 
+    def test_validate_params_rejects_non_integer_dimensions_and_iterations(self):
+        invalid_cases = [
+            RenderParams(width=32.5, height=24, max_iterations=20, x_min=-2.0, x_max=1.0, y_min=-1.0, y_max=1.0),
+            RenderParams(width=32, height=24.5, max_iterations=20, x_min=-2.0, x_max=1.0, y_min=-1.0, y_max=1.0),
+            RenderParams(width=32, height=24, max_iterations=20.5, x_min=-2.0, x_max=1.0, y_min=-1.0, y_max=1.0),
+        ]
+
+        for params in invalid_cases:
+            with self.subTest(params=params):
+                with self.assertRaises(ValueError):
+                    validate_params(params)
+
     def test_iterations_matrix_shape_and_range(self):
         params = validate_params(
             RenderParams(width=40, height=30, max_iterations=25, x_min=-2.0, x_max=1.0, y_min=-1.0, y_max=1.0)

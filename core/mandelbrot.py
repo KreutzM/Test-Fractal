@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from numbers import Integral
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -54,8 +55,20 @@ _PALETTE_STOPS: dict[str, np.ndarray] = {
     ),
 }
 
+PALETTE_NAMES = tuple(_PALETTE_STOPS)
+
+
+def _is_int_like(value: object) -> bool:
+    return isinstance(value, Integral) and not isinstance(value, bool)
+
 
 def validate_params(params: RenderParams) -> RenderParams:
+    if not _is_int_like(params.width):
+        raise ValueError("width must be an integer")
+    if not _is_int_like(params.height):
+        raise ValueError("height must be an integer")
+    if not _is_int_like(params.max_iterations):
+        raise ValueError("max_iterations must be an integer")
     if params.width <= 0:
         raise ValueError("width must be positive")
     if params.height <= 0:
