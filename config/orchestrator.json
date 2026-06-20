@@ -2,7 +2,7 @@
   "model": "gpt-5.4-mini",
   "base_branch": "main",
   "work_branch_prefix": "agent/issue-",
-  "max_cycles": 1,
+  "max_cycles": 2,
   "commit_message_template": "agent(issue #{issue}): implement planned change",
   "labels": {
     "queue": "agent-run",
