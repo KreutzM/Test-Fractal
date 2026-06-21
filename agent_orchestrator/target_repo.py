@@ -4,4 +4,5 @@ from pathlib import Path
 
 
 def normalize_repo(repo: Path | str) -> Path:
-    return Path(repo).expanduser().resolve()
+    path = Path(repo).expanduser().resolve()
+    return path
