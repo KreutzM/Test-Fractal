@@ -7,7 +7,7 @@ from string import Template
 from typing import Any
 
 from .run_log import estimate_tokens, utc_now
-from .shell import CommandResult, run_command
+from .shell import CommandResult, effective_cwd, run_command
 
 
 PROMPT_DIR = Path("prompts/roles")
@@ -165,12 +165,13 @@ def run_codex_role(
         )
         return result
 
+    work_cwd = effective_cwd(cwd) or cwd
     args = [
         "codex",
         "exec",
         "--json",
         "--cd",
-        str(Path(cwd).resolve()),
+        str(Path(work_cwd).resolve()),
         "--model",
         model,
         "--sandbox",
@@ -179,11 +180,11 @@ def run_codex_role(
         "never",
     ]
     if output_path is not None:
-        args.extend(["--output-last-message", str(output_path)])
+        args.extend(["--output-last-message", str(output_path.resolve())])
     if extra_args:
         args.extend(extra_args)
     args.append("-")
-    result = run_command(args, cwd=cwd, input_text=prompt, check=False)
+    result = run_command(args, cwd=work_cwd, input_text=prompt, check=False)
     artifacts = _write_role_artifacts(output_path=output_path, result=result)
     output_text = output_path.read_text(encoding="utf-8") if output_path and output_path.exists() else result.stdout
     _write_role_metrics(
