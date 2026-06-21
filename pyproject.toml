@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Micha k" }]
+dependencies = ["numpy", "Pillow"]
 
 [project.scripts]
 agent-orchestrator = "agent_orchestrator.cli:main"
