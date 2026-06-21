@@ -5,8 +5,17 @@ from pathlib import Path
 from .shell import CommandResult, run_command
 
 
+ORCHESTRATOR_REPO_ROOT = Path.cwd().resolve()
+
+
+def _github_cwd(cwd: Path | str) -> Path | str:
+    if str(cwd) == ".":
+        return ORCHESTRATOR_REPO_ROOT
+    return cwd
+
+
 def gh(args: list[str], *, cwd: Path | str = ".", check: bool = True) -> CommandResult:
-    return run_command(["gh", *args], cwd=cwd, check=check)
+    return run_command(["gh", *args], cwd=_github_cwd(cwd), check=check)
 
 
 def gh_available(cwd: Path | str = ".") -> bool:
