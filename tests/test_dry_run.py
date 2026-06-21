@@ -1,8 +1,10 @@
 from pathlib import Path
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
 
+from agent_orchestrator import state as state_module
 from agent_orchestrator.orchestrator import run_issue
 
 
@@ -19,6 +21,7 @@ class DryRunTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             config_path = Path(tmp) / "orchestrator.json"
+            state_root = Path(tmp) / "runs"
             config_path.write_text(
                 """
 {
@@ -58,7 +61,8 @@ class DryRunTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("agent_orchestrator.orchestrator.issue_view", return_value=issue), \
+            with patch.object(state_module, "STATE_ROOT", state_root), \
+                patch("agent_orchestrator.orchestrator.issue_view", return_value=issue), \
                 patch("agent_orchestrator.orchestrator.add_label_to_issue") as add_label, \
                 patch("agent_orchestrator.orchestrator.remove_label_from_issue") as remove_label, \
                 patch("agent_orchestrator.orchestrator.comment_issue") as comment_issue, \
@@ -79,7 +83,12 @@ class DryRunTests(unittest.TestCase):
 
                 code = run_issue(42, config_path=str(config_path), dry_run=True)
 
+            run_json = json.loads((state_root / "issue-42" / "run.json").read_text(encoding="utf-8"))
+            summary = (state_root / "issue-42" / "summary.md").read_text(encoding="utf-8")
+
         self.assertEqual(code, 0)
+        self.assertEqual(run_json["final_decision"], "approve")
+        self.assertIn("- Final decision: `approve`", summary)
         add_label.assert_not_called()
         remove_label.assert_not_called()
         comment_issue.assert_not_called()
