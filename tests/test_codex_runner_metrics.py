@@ -1,11 +1,12 @@
 from pathlib import Path
 import json
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from agent_orchestrator.codex_runner import _extract_usage_from_events, run_codex_role
-from agent_orchestrator.shell import CommandResult
+from agent_orchestrator.shell import CommandResult, TARGET_REPO_ENV
 
 
 class CodexRunnerMetricsTests(unittest.TestCase):
@@ -117,6 +118,40 @@ class CodexRunnerMetricsTests(unittest.TestCase):
             self.assertEqual(metrics["codex_usage"]["input_tokens"], 10)
             self.assertEqual(metrics["codex_usage"]["output_tokens"], 3)
             self.assertEqual(metrics["codex_usage"]["total_tokens"], 13)
+
+    def test_target_repo_env_controls_codex_workdir_but_keeps_output_absolute(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target_repo = root / "target"
+            target_repo.mkdir()
+            prompt_dir = root / "prompts"
+            prompt_dir.mkdir()
+            (prompt_dir / "reviewer.md").write_text("Review $thing", encoding="utf-8")
+            output_path = root / "runs" / "reviewer-cycle-1.md"
+            events = json.dumps({"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 2}})
+
+            def fake_run_command(args, *, cwd=None, input_text=None, check=True, env=None):
+                self.assertEqual(Path(cwd).resolve(), target_repo.resolve())
+                self.assertEqual(args[args.index("--cd") + 1], str(target_repo.resolve()))
+                self.assertEqual(args[args.index("--output-last-message") + 1], str(output_path.resolve()))
+                return CommandResult(args, 0, events + "\n", "")
+
+            with (
+                patch.dict(os.environ, {TARGET_REPO_ENV: str(target_repo)}),
+                patch("agent_orchestrator.codex_runner.PROMPT_DIR", prompt_dir),
+                patch("agent_orchestrator.codex_runner.run_command", fake_run_command),
+            ):
+                result = run_codex_role(
+                    role="reviewer",
+                    variables={"thing": "feature"},
+                    model="test-model",
+                    sandbox="read-only",
+                    approval="never",
+                    output_path=output_path,
+                )
+
+            self.assertTrue(result.ok)
+            self.assertTrue(output_path.with_suffix(output_path.suffix + ".metrics.json").exists())
 
 
 if __name__ == "__main__":
