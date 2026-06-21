@@ -14,6 +14,7 @@ class CliVersionTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0)
         self.assertTrue(completed.stdout.strip())
+        self.assertEqual(completed.stderr, "")
 
 
 if __name__ == "__main__":
