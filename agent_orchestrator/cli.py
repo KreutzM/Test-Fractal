@@ -16,6 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="Run Planner, Builder, and Reviewer for a GitHub issue.")
     run.add_argument("--issue", type=int, required=True, help="GitHub issue number to process.")
     run.add_argument("--config", default="config/orchestrator.json", help="Path to orchestrator config JSON.")
+    run.add_argument("--repo", default=".", help="Target repository working tree for Git, tests, and Codex.")
     run.add_argument("--dry-run", action="store_true", help="Render prompts and flow without calling Codex or changing Git.")
     return parser
 
@@ -36,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "run":
-        return run_issue(args.issue, config_path=args.config, dry_run=args.dry_run)
+        return run_issue(args.issue, config_path=args.config, repo=args.repo, dry_run=args.dry_run)
 
     parser.print_help()
     return 2
