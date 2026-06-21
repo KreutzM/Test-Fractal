@@ -11,3 +11,7 @@ def normalize_repo(repo: Path | str) -> Path:
 
 def current_working_directory() -> Path:
     return Path(os.getcwd()).resolve()
+
+
+def switch_working_directory(path: Path) -> None:
+    os.chdir(path)
