@@ -190,9 +190,20 @@ class RunState:
             "reviewer": _metrics_sidecar(self.reviewer_output),
         }
 
+    def _is_current_run_metric(self, path: Path) -> bool:
+        """Ignore stale metrics left over from previous runs of the same issue."""
+        try:
+            started = datetime.fromisoformat(self.started_at).timestamp()
+            modified = path.stat().st_mtime
+        except (OSError, ValueError):
+            return False
+        return modified >= started - 1
+
     def _token_usage(self) -> dict[str, Any]:
         entries: list[dict[str, Any]] = []
         for path in sorted(self.run_dir.glob("*.metrics.json")):
+            if not self._is_current_run_metric(path):
+                continue
             metric = _read_metric(path)
             if metric is None:
                 continue
