@@ -239,6 +239,8 @@ def run_issue(issue_number: int, *, config_path: str = "config/orchestrator.json
                 raise RuntimeError(f"Reviewer failed: {reviewer_result.stderr}")
 
             decision = _review_decision(reviewer_text)
+            state.final_decision = decision
+            state.save()
             if decision == "approve":
                 break
             if decision == "block":
