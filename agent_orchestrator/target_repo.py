@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
 
-def hello() -> str:
-    return "target repo"
+
+def normalize_repo(repo: Path | str) -> Path:
+    return Path(repo).expanduser().resolve()
