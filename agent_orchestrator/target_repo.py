@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from . import codex_runner
+from . import state as state_module
 
 
 def normalize_repo(repo: Path | str) -> Path:
