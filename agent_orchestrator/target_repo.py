@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from . import codex_runner
+
 
 def normalize_repo(repo: Path | str) -> Path:
     path = Path(repo).expanduser().resolve()
