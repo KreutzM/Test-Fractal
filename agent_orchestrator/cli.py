@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import os
+from pathlib import Path
+
 from .doctor import check_environment
 from .labels import ensure_agent_labels
 from .orchestrator import run_issue
+from .shell import TARGET_REPO_ENV
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,8 +20,22 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="Run Planner, Builder, and Reviewer for a GitHub issue.")
     run.add_argument("--issue", type=int, required=True, help="GitHub issue number to process.")
     run.add_argument("--config", default="config/orchestrator.json", help="Path to orchestrator config JSON.")
+    run.add_argument("--repo", default=".", help="Target repository working tree for Git, tests, and Codex.")
     run.add_argument("--dry-run", action="store_true", help="Render prompts and flow without calling Codex or changing Git.")
     return parser
+
+
+def _run_with_target_repo(args: argparse.Namespace) -> int:
+    old_target = os.environ.get(TARGET_REPO_ENV)
+    repo = Path(args.repo).expanduser().resolve()
+    os.environ[TARGET_REPO_ENV] = str(repo)
+    try:
+        return run_issue(args.issue, config_path=args.config, dry_run=args.dry_run)
+    finally:
+        if old_target is None:
+            os.environ.pop(TARGET_REPO_ENV, None)
+        else:
+            os.environ[TARGET_REPO_ENV] = old_target
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "run":
-        return run_issue(args.issue, config_path=args.config, dry_run=args.dry_run)
+        return _run_with_target_repo(args)
 
     parser.print_help()
     return 2

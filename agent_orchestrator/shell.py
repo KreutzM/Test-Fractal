@@ -8,6 +8,9 @@ from shutil import which
 from typing import Mapping, Sequence
 
 
+TARGET_REPO_ENV = "AGENT_ORCHESTRATOR_TARGET_REPO"
+
+
 @dataclass(frozen=True)
 class CommandResult:
     args: list[str]
@@ -60,6 +63,13 @@ def resolve_executable(args: Sequence[str]) -> list[str]:
     return resolved
 
 
+def effective_cwd(cwd: Path | str | None = None) -> Path | str | None:
+    target_repo = os.environ.get(TARGET_REPO_ENV)
+    if target_repo and (cwd is None or str(cwd) == "."):
+        return Path(target_repo)
+    return cwd
+
+
 def run_command(
     args: Sequence[str],
     *,
@@ -69,10 +79,11 @@ def run_command(
     check: bool = False,
 ) -> CommandResult:
     resolved_args = resolve_executable(args)
+    command_cwd = effective_cwd(cwd)
     try:
         completed = subprocess.run(
             resolved_args,
-            cwd=str(cwd) if cwd else None,
+            cwd=str(command_cwd) if command_cwd else None,
             input=input_text,
             text=True,
             encoding="utf-8",
