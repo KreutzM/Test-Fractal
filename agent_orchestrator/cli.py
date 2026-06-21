@@ -28,6 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
 def _run_with_target_repo(args: argparse.Namespace) -> int:
     old_target = os.environ.get(TARGET_REPO_ENV)
     repo = Path(args.repo).expanduser().resolve()
+    if not repo.exists():
+        print(f"Target repository path does not exist: {repo}")
+        return 1
+    if not repo.is_dir():
+        print(f"Target repository path is not a directory: {repo}")
+        return 1
     os.environ[TARGET_REPO_ENV] = str(repo)
     try:
         return run_issue(args.issue, config_path=args.config, dry_run=args.dry_run)
